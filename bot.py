@@ -48,17 +48,51 @@ async def help_command(client: Client, message: Message):
     """✅ Sends a list of available commands as buttons"""
     keyboard = InlineKeyboardMarkup(
         [
-            [InlineKeyboardButton("⚙️ View Config", callback_data="config")],
+            [InlineKeyboardButton("📝 View Tutorial", callback_data="tutorial")],
+            [InlineKeyboardButton("📌 Example Input", callback_data="example_input")],
             [
+                InlineKeyboardButton("⚙️ View Config", callback_data="config"),
                 InlineKeyboardButton("🔧 Set Identifier", callback_data="set_identifier"),
-                InlineKeyboardButton("🔗 Set Redirect URL", callback_data="set_redirect_url")
-            ]
+            ],
+            [InlineKeyboardButton("🔗 Set Redirect URL", callback_data="set_redirect_url")]
         ]
     )
     await message.reply_text(
-        "🛠 **Bot Commands:**\n\n"
-        "Click a button below to configure the bot settings or update details.",
+        "🛠 **Bot Commands & Help:**\n\n"
+        "Click a button below to learn more or configure your bot.",
         reply_markup=keyboard,
+        disable_web_page_preview=True
+    )
+
+# =========================== View Example Input ===========================
+@bot.on_callback_query(filters.regex("example_input"))
+async def example_input(client: Client, query: CallbackQuery):
+    """✅ Displays an example of the input format"""
+    await query.message.edit_text(
+        "**📌 Example Input Format:**\n\n"
+        "`[SEASON 1 + https://t.me/iBoxTV66666bot?start=Z2V0LTU5NzY4MTAxMTU0MzU5NjUtNTk4NTgyNzkzNDU1Mzk3NA]`\n"
+        "`[NEW SEASON 2 + https://t.me/iBoxTV66666bot?start=Z2V0LTYzODI2MTE5NzU3NDYzNzAtNjM5MjYzMTc3NDc2NjM4MA]`\n\n"
+        "💡 Use this format when sending links to be converted.\n\n"
+        "🔙 Press **Back** to return.",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="help")]]),
+        disable_web_page_preview=True
+    )
+
+# =========================== View Tutorial ===========================
+@bot.on_callback_query(filters.regex("tutorial"))
+async def tutorial(client: Client, query: CallbackQuery):
+    """✅ Displays a tutorial on how to use the bot"""
+    await query.message.edit_text(
+        "**📖 How to Use the Bot:**\n\n"
+        "1️⃣ Copy & paste an old Telegram bot link in the correct format.\n"
+        "2️⃣ Send it to this bot.\n"
+        "3️⃣ The bot will convert the link to use the **new redirector URL**.\n"
+        "4️⃣ Copy and use the new link!\n\n"
+        "⚙️ You can also configure settings using the buttons below.",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("📌 Example Input", callback_data="example_input")],
+            [InlineKeyboardButton("🔙 Back", callback_data="help")]
+        ]),
         disable_web_page_preview=True
     )
 
@@ -103,7 +137,7 @@ async def button_handler(client: Client, query: CallbackQuery):
             f"⚙ **Current Bot Configuration:**\n"
             f"🔹 **Bot Identifier:** `{settings['bot_identifier']}`\n"
             f"🔹 **Redirect URL:** `{settings['redirect_url']}`",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="start")]])
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="help")]])
         )
 
     elif data == "set_identifier":
