@@ -3,12 +3,17 @@
 
 ---
 
-## 🚀 Deploy to Heroku (One Click)
-https://heroku.com/deploy?template=https://github.com/manybotts/oldlinkconverter
+# Telegram Old Links Converter Bot
+This bot converts old Telegram deep links into new Heroku-based redirector links.
 
+## Features
+✅ Converts old links  
+✅ Supports multiple bot identifiers  
+✅ One-Click Heroku Deployment  
 
-**Deploy your bot instantly on Heroku with one click:**
-[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/manybotts/oldlinkconverter)
+## Deploy to Heroku
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/manybotts/oldlinkconverter/tree/main)
+
 
 ---
 
