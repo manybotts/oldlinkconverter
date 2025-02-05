@@ -4,6 +4,9 @@
 ---
 
 ## 🚀 Deploy to Heroku (One Click)
+https://heroku.com/deploy?template=https://github.com/manybotts/oldlinkconverter
+
+
 **Deploy your bot instantly on Heroku with one click:**
 [![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/manybotts/oldlinkconverter)
 
