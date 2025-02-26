@@ -42,6 +42,9 @@ API_HASH = os.getenv("API_HASH", "your_api_hash")
 BOT_TOKEN = os.getenv("BOT_TOKEN", "your_bot_token")
 bot = Client("LinkConverterBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
+# ✅ State management for input
+user_states = {}  # Dictionary to store user states: {user_id: "state"}
+
 # =========================== Start Command ===========================
 @bot.on_message(filters.command("start"))
 async def start(client: Client, message: Message):
@@ -106,6 +109,8 @@ async def tutorial(client: Client, query: CallbackQuery):
 # =========================== Set Redirect URL ===========================
 @bot.on_message(filters.command("set_redirect_url") & filters.user(ALLOWED_USERS))
 async def set_redirect_url(client: Client, message: Message):
+    user_id = message.from_user.id
+    user_states[user_id] = "waiting_for_url" # Set the user's state
     await message.reply_text(
         "🔗 **Send the new redirect URL AND the associated old bot username, separated by a space.**\n\n"
         "Example: `http://secure.tg-files.com/skyking/bot8 HD10SHARE888888BOT`",
@@ -115,6 +120,8 @@ async def set_redirect_url(client: Client, message: Message):
 # ====================== Add Old Bot Username ======================
 @bot.on_message(filters.command("add_old_bot_username") & filters.user(ALLOWED_USERS))
 async def add_old_bot_username(client: Client, message: Message):
+    user_id = message.from_user.id
+    user_states[user_id] = "waiting_for_username"  # Set user's state
     await message.reply_text(
         "🤖 **Send the username of the old bot you are adding** (e.g., `HD10SHARE888888BOT`).  **Do not include the @ symbol.**",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancel", callback_data="config")]])
@@ -122,6 +129,10 @@ async def add_old_bot_username(client: Client, message: Message):
 #Handles the old bot username
 @bot.on_message(filters.user(ALLOWED_USERS) & ~filters.command(["start", "help", "config", "set_redirect_url","add_old_bot_username"]) & filters.regex(r"^[a-zA-Z0-9_]{5,32}$"))
 async def handle_old_bot_username_input(client: Client, message:Message):
+    user_id = message.from_user.id
+    if user_states.get(user_id) != "waiting_for_username":
+        # Ignore if not in the correct state
+        return
     new_username = message.text.strip()
     if new_username.startswith("@"):
         await message.reply_text("❌ **Invalid username format.** Please enter the username *without* the @ symbol.")
@@ -137,10 +148,15 @@ async def handle_old_bot_username_input(client: Client, message:Message):
     settings["username_redirect_pairs"].append({"username": new_username, "redirect_url": ""})
     save_settings(settings)
     await message.reply_text(f"✅ **Old bot username `{new_username}` added.**  Now use `/set_redirect_url` to set its redirect URL.")
+    user_states.pop(user_id, None)  # Remove user from state tracking
 
 
 @bot.on_message(filters.user(ALLOWED_USERS) & ~filters.command(["start", "help", "config", "set_redirect_url", "add_old_bot_username"]))
-async def handle_redirect_url_input(client: Client, message: Message):
+async def handle_set_redirect_url_input(client: Client, message: Message):
+    user_id = message.from_user.id
+    if user_states.get(user_id) != "waiting_for_url":
+        # If the user is not in the "waiting_for_url" state, ignore the message
+        return
     """Handles the input of the redirect URL and associates it with an old bot username."""
     input_text = message.text.strip()
     parts = input_text.split()
@@ -181,6 +197,8 @@ async def handle_redirect_url_input(client: Client, message: Message):
 
     save_settings(settings)
     await message.reply_text(f"✅ **Redirect URL updated for username `{old_bot_username}` to:** `{new_url}`")
+    user_states.pop(user_id, None)  # Remove user from state tracking
+
 # =========================== View Config ===========================
 @bot.on_message(filters.command("config"))
 async def view_config(client: Client, message: Message):
@@ -197,6 +215,7 @@ async def view_config(client: Client, message: Message):
 @bot.on_callback_query()
 async def button_handler(client: Client, query: CallbackQuery):
     data = query.data
+    user_id = query.from_user.id
 
     if data == "config":
       config_text = "⚙ **Current Bot Configuration:**\n\n"
@@ -218,12 +237,17 @@ async def button_handler(client: Client, query: CallbackQuery):
     elif data == "help":
         await help_command(client, query.message)
     elif data == "set_redirect_url":
-        await message.reply_text(
+        user_states[user_id] = "waiting_for_url"  #Set the user state
+        await query.message.edit_text(
         "🔗 **Send the new redirect URL AND the associated old bot username, separated by a space.**\n\n"
         "Example: `http://secure.tg-files.com/skyking/bot8 HD10SHARE888888BOT`",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancel", callback_data="config")]]))
     elif data == "add_old_bot_username":
-        await add_old_bot_username(client, query.message)
+        user_states[user_id] = "waiting_for_username" #Set the user state
+        await query.message.edit_text(
+        "🤖 **Send the username of the old bot you are adding** (e.g., `HD10SHARE888888BOT`).  **Do not include the @ symbol.**",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancel", callback_data="config")]])
+        )
 
 def chunk_text(text, max_length):
     """Splits text into chunks of at most max_length."""
@@ -288,10 +312,4 @@ async def handle_link_conversion(client: Client, message: Message):
             disable_web_page_preview=True
         )
 
-# =========================== Handle Unexpected Texts ===========================
-@bot.on_message(filters.text & ~filters.user(ALLOWED_USERS))
-async def handle_unexpected_text(client: Client, message: Message):
-    await message.reply_text("❌ **Invalid command!** Use `/help` to see available commands. Only authorized users can interact with this bot.")
-
-# ✅ Start the bot
-bot.run()
+# =
