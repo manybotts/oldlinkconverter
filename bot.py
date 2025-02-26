@@ -1,6 +1,6 @@
 import json
 import os
-import re  # Import the regular expression module
+import re
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 
@@ -25,8 +25,13 @@ def save_settings(settings):
 # ✅ Load initial settings
 settings = load_settings()
 
-# ✅ Replace with YOUR Telegram user ID
-ADMIN_USER_ID = 123456789
+# ✅ Load ALLOWED_USERS from environment variable
+ALLOWED_USERS_STR = os.getenv("ALLOWED_USERS", "")
+ALLOWED_USERS = [int(user_id.strip()) for user_id in ALLOWED_USERS_STR.split(",") if user_id.strip()]
+
+# ✅ Check if ALLOWED_USERS is valid
+if not ALLOWED_USERS:
+    print("WARNING: ALLOWED_USERS environment variable not set or empty.  Bot will not allow any users to set the URL.")
 
 # ✅ Initialize the bot
 API_ID = int(os.getenv("API_ID", "123456"))
@@ -86,12 +91,12 @@ async def tutorial(client: Client, query: CallbackQuery):
         "1️⃣ Send the **base redirect URL** to this bot.\n     Example: `http://secure.tg-files.com/skyking/bot8`\n"
         "2️⃣ The bot will store this URL, ensuring it's in HTTPS format.\n"
         "3️⃣ Your external link conversion service should use this stored URL as the base for constructing redirect links.\n\n"
-        "⚙️ You can view the current configuration using the /config command.",
+        "⚙️ You can view the current configuration using the /config command. Only authorized users can change the URL.",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="help")]]),
         disable_web_page_preview=True
     )
 # =========================== Set Redirect URL ===========================
-@bot.on_message(filters.command("set_redirect_url") & filters.user(ADMIN_USER_ID))
+@bot.on_message(filters.command("set_redirect_url") & filters.user(ALLOWED_USERS))
 async def set_redirect_url(client: Client, message: Message):
     await message.reply_text(
         "🔗 **Send the new redirect URL** (e.g., `http://secure.tg-files.com/skyking/bot8`)",
@@ -122,7 +127,7 @@ async def button_handler(client: Client, query: CallbackQuery):
         await help_command(client, query.message)
 
 # ====================== Handle Redirect URL Input ======================
-@bot.on_message(filters.regex(r"^https?://.+") & filters.user(ADMIN_USER_ID) & ~filters.command(["start", "help", "config", "set_redirect_url"]))
+@bot.on_message(filters.regex(r"^https?://.+") & filters.user(ALLOWED_USERS) & ~filters.command(["start", "help", "config", "set_redirect_url"]))
 async def handle_redirect_url_input(client: Client, message: Message):
     """Handles the input of the redirect URL, validates it, and saves it in https format."""
     new_url = message.text.strip()
@@ -139,16 +144,15 @@ async def handle_redirect_url_input(client: Client, message: Message):
     if new_url.startswith("http://"):
         new_url = new_url.replace("http://", "https://")
     elif not new_url.startswith("https://"):
-        new_url = "https://" + new_url  # In case no protocol was given at all
+        new_url = "https://" + new_url
 
     settings["redirect_url"] = new_url
     save_settings(settings)
     await message.reply_text(f"✅ **Redirect URL updated to:** `{settings['redirect_url']}`")
 
 # =========================== Handle Unexpected Texts ===========================
-@bot.on_message(filters.text & ~filters.user(ADMIN_USER_ID))
+@bot.on_message(filters.text & ~filters.user(ALLOWED_USERS))
 async def handle_unexpected_text(client: Client, message: Message):
-    await message.reply_text("❌ **Invalid command!** Use `/help` to see available commands.  Only the administrator can set the redirect URL.")
-
+    await message.reply_text("❌ **Invalid command!** Use `/help` to see available commands.  Only authorized users can set the redirect URL.")
 # ✅ Start the bot
 bot.run()
