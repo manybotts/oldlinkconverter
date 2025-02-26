@@ -104,7 +104,7 @@ async def tutorial(client: Client, query: CallbackQuery):
         "   - Use `/delete_old_bot_username` to remove a username and its URL.\n"
         "2️⃣ **Start Conversion:** Use `/start_conversion` to begin converting links.\n"
         "3️⃣ **Paste Your Links:** Paste your links (multiple lines are allowed).\n"
-        "4️⃣ **Stop Conversion:** Use `/stop_conversion` to stop converting links.\n\n"        
+        "4️⃣ **Stop Conversion:** Use `/stop_conversion` to stop converting links.\n\n"
         "⚙️ View current configuration: /config. Only authorized users can change settings.",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="help")]]),
         disable_web_page_preview=True
@@ -162,7 +162,6 @@ async def stop_conversion_handler(client: Client, message: Message):
     user_id = message.from_user.id
     user_states.pop(user_id, None)  # Remove the state, if it exists
     await message.reply_text("🛑 **Link conversion stopped.**")
-
 #End of Part 1 of 3
 #Handles the old bot username
 @bot.on_message(filters.user(ALLOWED_USERS) & ~filters.command(["start", "help", "config", "set_redirect_url","add_old_bot_username", "edit_redirect_url", "delete_old_bot_username"]) & filters.regex(r"^[a-zA-Z0-9_]{5,32}$"))
@@ -391,7 +390,7 @@ def chunk_text(text, max_length):
     if current_chunk:
         chunks.append(current_chunk.strip())
     return chunks
-# End of part 2 of 4
+#End of Part 2 of 3
 # ====================== Handle Link Conversion ======================
 @bot.on_message(filters.text & filters.user(ALLOWED_USERS) & ~filters.command(["start", "help", "config", "set_redirect_url", "add_old_bot_username", "edit_redirect_url", "delete_old_bot_username","stop_conversion"]))
 async def handle_link_conversion(client: Client, message: Message):
