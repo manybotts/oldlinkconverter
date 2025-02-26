@@ -231,7 +231,7 @@ async def handle_set_redirect_url_input(client: Client, message: Message):
 
         # Validate the URL
         url_pattern = re.compile(
-            r"^(?:http(s)?:\/\/)?[\w.-]+(?:\.[\w\.-]+)+[\w\-\._~:/?#[\]@!\$&'\(\)\*\+,;=.]+$"
+            r"^(?:http(s)?:\/\/)?[\w.-]+(?:\.[\w\.-]+)+[\w\-\._~:/?#[\]@!$&'()*+,;=.]+$"  # Corrected Regex
         )
         if not url_pattern.match(new_url):
             await message.reply_text("❌ **Invalid URL format.** Please provide a valid URL.")
@@ -268,7 +268,7 @@ async def handle_set_redirect_url_input(client: Client, message: Message):
 
         # Validate URL
         url_pattern = re.compile(
-            r"^(?:http(s)?:\/\/)?[\w.-]+(?:\.[\w\.-]+)+[\w\-\._~:/?#[\]@!\<span class="math-inline">&'\\\(\\\)\\\*\\\+,;\=\.\]\+</span>"
+            r"^(?:http(s)?:\/\/)?[\w.-]+(?:\.[\w\.-]+)+[\w\-\._~:/?#[\]@!$&'()*+,;=.]+$" # Corrected Regex
         )
         if not url_pattern.match(new_url):
             await message.reply_text("❌ **Invalid URL format.**")
@@ -279,11 +279,7 @@ async def handle_set_redirect_url_input(client: Client, message: Message):
             new_url = new_url.replace("http://", "https://")
         elif not new_url.startswith("https://"):
             new_url = "https://" + new_url
-        # Reload settings
-        global settings
-        settings = load_settings()
-        # Update the redirect URL
-        # Reload settings
+    # Reload settings
         global settings
         settings = load_settings()
         # Update the redirect URL
@@ -436,4 +432,3 @@ async def handle_unexpected_text(client: Client, message: Message):
 
 # ✅ Start the bot
 bot.run()
-        
