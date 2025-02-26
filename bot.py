@@ -81,7 +81,8 @@ async def example_input(client: Client, query: CallbackQuery):
         "**📌 Example Input Format:**\n\n"
         "`[SEASON 1 + https://t.me/HD10SHARE888888BOT?start=Z2V0LTM2NTcwNDE1MTA1ODQzMC0zODE3MzUwMTc5NTQxNDI]`\n"
         "`[SEASON 2 + https://t.me/HD10SHARE888888BOT?start=Z2V0LTM4MjczNjk0NzEzNTEyNC0zOTg3Njc4MTQwMzA4MzY]`\n\n"
-        "💡 Paste your links in this format.  The bot will replace the base URL *only* if the bot username (without @) matches the one set in the configuration.",
+        "`[Example Channel Link + https://t.me/ExampleChannel]`\n\n"
+        "💡 Paste your links in this format.  The bot will replace the base URL *only* if the bot username (without @) matches the one set in the configuration. Other lines will be preserved.",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="help")]]),
         disable_web_page_preview=True
     )
@@ -94,8 +95,8 @@ async def tutorial(client: Client, query: CallbackQuery):
         "1️⃣ **Set Configuration (Admins Only):**\n"
         "   - Use `/set_redirect_url` to set the base URL for your redirection service.\n"
         "   - Use `/set_old_bot_username` to set the username (without @) of the bot you're replacing links for.\n"
-        "2️⃣ **Paste Your Links:** Paste your links in the specified format (see Example Input).\n"
-        "3️⃣ **Get Converted Links:** The bot will automatically convert the links (if the bot username matches) and send them back.\n\n"
+        "2️⃣ **Paste Your Links:** Paste your links (multiple lines are allowed).\n"
+        "3️⃣ **Get Converted Links:** The bot will automatically convert the links (if the bot username matches) and send them back, preserving other lines.\n\n"
         "⚙️ View current configuration: /config. Only authorized users can change settings.",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="help")]]),
         disable_web_page_preview=True
@@ -190,41 +191,40 @@ async def handle_redirect_url_input(client: Client, message: Message):
 async def handle_link_conversion(client: Client, message: Message):
     """Converts multiple links from the input message."""
     input_text = message.text.strip()
-    converted_links = []
+    output_lines = []  # Store processed lines here
     old_bot_username = settings["old_bot_username"]
 
     # Check if old_bot_username is set
     if not old_bot_username:
         await message.reply_text("❌ **Old bot username not set.** Please set it using `/set_old_bot_username`.")
         return
-    # Find all link matches in the input
-    for match in re.finditer(r"\[([^\]]+) \+ (https:\/\/t\.me\/([^?]+))\?start=([^\]]+)\]", input_text):
-        text_part = match.group(1).strip()
-        full_url = match.group(2).strip()
-        extracted_username = match.group(3).strip()
-        start_parameter = match.group(4).strip()
 
-        # Check if the extracted username matches the stored old_bot_username
-        if extracted_username == old_bot_username:
-            # Construct the new URL
-            new_url = f"{settings['redirect_url']}?start={start_parameter}"
-            converted_links.append(f"[{text_part} + {new_url}]") # Include brackets here
+    # Process each line separately
+    for line in input_text.splitlines():
+        line = line.strip()
+        match = re.search(r"\[([^\]]+) \+ (https:\/\/t\.me\/([^?]+))\?start=([^\]]+)\]", line)
 
-    #Check if the bot could find links
-    if not converted_links:
-        await message.reply_text("❌ **No valid links found for the configured bot username.**  Please check the input and the configured `old_bot_username`.")
-        return
-    # Join all converted links into a single string, one link per line
-    output_text = "\n".join(converted_links) # No backticks here
+        if match:
+            text_part = match.group(1).strip()
+            full_url = match.group(2).strip()
+            extracted_username = match.group(3).strip()
+            start_parameter = match.group(4).strip()
+
+            if extracted_username == old_bot_username:
+                new_url = f"{settings['redirect_url']}?start={start_parameter}"
+                output_lines.append(f"[{text_part} + {new_url}]")  # Reconstruct with new URL
+            else:
+                output_lines.append(line)  # Keep original line if username doesn't match
+        else:
+            output_lines.append(line)  # Keep original line if no match
+
+    # Join all lines into a single string
+    output_text = "\n".join(output_lines)
 
     await message.reply_text(
-        f"**✅ Converted Links:**\n\n`{output_text}`", # Triple backticks here
+        f"**✅ Converted Links:**\n\n`{output_text}`",
         disable_web_page_preview=True
     )
 # =========================== Handle Unexpected Texts ===========================
 @bot.on_message(filters.text & ~filters.user(ALLOWED_USERS))
-async def handle_unexpected_text(client: Client, message: Message):
-    await message.reply_text("❌ **Invalid command!** Use `/help` to see available commands. Only authorized users can interact with this bot.")
-
-# ✅ Start the bot
-bot.run()
+async def handle_unexpected_text(client:
