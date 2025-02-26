@@ -1,6 +1,6 @@
 {
-  "name": "Telegram Old Links Converter Bot",
-  "description": "A bot that converts old Telegram bot links to Heroku-based redirector URLs.",
+  "name": "Telegram Redirect URL Setter Bot",
+  "description": "A bot that stores the base URL and old bot username for a Telegram link redirection service.",
   "repository": "https://github.com/manybotts/oldlinkconverter",
   "stack": "heroku-22",
   "buildpacks": [
@@ -27,13 +27,24 @@
       "description": "Your Telegram Bot Token (Get it from @BotFather)",
       "required": true
     },
-    "HEROKU_APP_URL": {
-      "description": "The base URL of your redirector app (e.g., https://your-app.herokuapp.com)",
+    "MONGO_URL": {
+      "description": "Your MongoDB connection string (e.g., from MongoDB Atlas)",
       "required": true
     },
-    "BOT_IDENTIFIER": {
-      "description": "Unique bot identifier for the redirector (e.g., bot1, bot2)",
+    "DB_NAME": {
+      "description": "Your MongoDB database name (default: link_converter_bot)",
+      "required": true,
+      "value": "link_converter_bot"
+    },
+    "ALLOWED_USERS": {
+      "description": "Comma-separated list of Telegram User IDs allowed to configure the bot (e.g., 123456789,987654321)",
       "required": true
     }
-  }
+  },
+    "addons": [
+    {
+      "plan": "mongodbatlas:shared",
+      "as": "MONGO"
+    }
+  ]
 }
