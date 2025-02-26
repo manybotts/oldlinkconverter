@@ -197,6 +197,10 @@ async def handle_link_conversion(client: Client, message: Message):
     """Converts multiple links from the input message."""
     input_text = message.text.strip()
     output_lines = []  # Store processed lines here
+
+    # ✅ Reload settings from the database *here*
+    global settings  # Important: Use the global settings variable
+    settings = load_settings()
     old_bot_username = settings["old_bot_username"]
 
     # Check if old_bot_username is set
