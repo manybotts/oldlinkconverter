@@ -102,8 +102,9 @@ async def tutorial(client: Client, query: CallbackQuery):
         "   - Use `/set_redirect_url` to set the redirect URL for a username.\n"
         "   - Use `/edit_redirect_url` to modify an existing redirect URL.\n"
         "   - Use `/delete_old_bot_username` to remove a username and its URL.\n"
-        "2️⃣ **Paste Your Links:** Paste your links (multiple lines are allowed).\n"
-        "3️⃣ **Get Converted Links:** The bot will convert the links and send them back.\n\n"
+        "2️⃣ **Start Conversion:** Use `/start_conversion` to begin converting links.\n"
+        "3️⃣ **Paste Your Links:** Paste your links (multiple lines are allowed).\n"
+        "4️⃣ **Stop Conversion:** Use `/stop_conversion` to stop converting links.\n\n"        
         "⚙️ View current configuration: /config. Only authorized users can change settings.",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="help")]]),
         disable_web_page_preview=True
@@ -148,6 +149,21 @@ async def delete_old_bot_username(client: Client, message: Message):
         "🗑️ **Send the username of the old bot you want to DELETE.**  (This will remove both the username and its redirect URL.)",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancel", callback_data="config")]])
     )
+
+# ====================== Start/Stop Conversion ======================
+@bot.on_message(filters.command("start_conversion") & filters.user(ALLOWED_USERS))
+async def start_conversion_handler(client: Client, message: Message):
+    user_id = message.from_user.id
+    user_states[user_id] = "converting"
+    await message.reply_text("✅ **Link conversion started.** Now paste your links.")
+
+@bot.on_message(filters.command("stop_conversion") & filters.user(ALLOWED_USERS))
+async def stop_conversion_handler(client: Client, message: Message):
+    user_id = message.from_user.id
+    user_states.pop(user_id, None)  # Remove the state, if it exists
+    await message.reply_text("🛑 **Link conversion stopped.**")
+
+#End of Part 1 of 3
 #Handles the old bot username
 @bot.on_message(filters.user(ALLOWED_USERS) & ~filters.command(["start", "help", "config", "set_redirect_url","add_old_bot_username", "edit_redirect_url", "delete_old_bot_username"]) & filters.regex(r"^[a-zA-Z0-9_]{5,32}$"))
 async def handle_old_bot_username_input(client: Client, message:Message):
@@ -296,7 +312,7 @@ async def handle_set_redirect_url_input(client: Client, message: Message):
     else:
         # Ignore if not in the correct state.
         return
-# End of Part 1 of 4
+
 # =========================== View Config ===========================
 @bot.on_message(filters.command("config"))
 async def view_config(client: Client, message: Message):
@@ -341,8 +357,7 @@ async def button_handler(client: Client, query: CallbackQuery):
         await query.message.edit_text(
         "🔗 **Send the new redirect URL AND the associated old bot username, separated by a space.**\n\n"
         "Example: `http://secure.tg-files.com/skyking/bot8 HD10SHARE888888BOT`",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancel", callback_data="config")]])
-        )
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancel", callback_data="config")]]))
     elif data == "add_old_bot_username":
         user_states[user_id] = "waiting_for_username" #Set the user state
         await query.message.edit_text(
@@ -376,16 +391,28 @@ def chunk_text(text, max_length):
     if current_chunk:
         chunks.append(current_chunk.strip())
     return chunks
+# End of part 2 of 4
 # ====================== Handle Link Conversion ======================
-@bot.on_message(filters.text & filters.user(ALLOWED_USERS) & ~filters.command(["start", "help", "config", "set_redirect_url", "add_old_bot_username", "edit_redirect_url", "delete_old_bot_username"]))
+@bot.on_message(filters.text & filters.user(ALLOWED_USERS) & ~filters.command(["start", "help", "config", "set_redirect_url", "add_old_bot_username", "edit_redirect_url", "delete_old_bot_username","stop_conversion"]))
 async def handle_link_conversion(client: Client, message: Message):
     """Converts multiple links from the input message."""
-    global settings
+    user_id = message.from_user.id
+    if user_states.get(user_id) != "converting":
+        return  # Only process if in converting state
+
     input_text = message.text.strip()
     output_lines = []
 
     # Reload settings from the database
+    global settings
     settings = load_settings()
+
+    # Check if there are ANY configured usernames/redirect URLs
+    if not settings["username_redirect_pairs"]:
+        await message.reply_text("❌ **No redirect URLs configured.** Please add a username and redirect URL using `/add_old_bot_username` and `/set_redirect_url`.")
+        return
+
+
     # Process each line separately
     for line in input_text.splitlines():
         line = line.strip()
@@ -432,4 +459,4 @@ async def handle_unexpected_text(client: Client, message: Message):
 # ✅ Start the bot
 bot.run()
 
-#End of Part 2 of 4
+#End of Part 3 of 3
