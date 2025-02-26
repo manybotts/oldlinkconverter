@@ -1,27 +1,32 @@
-import json
 import os
 import re
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+import pymongo
 
-# ✅ Configuration file
-CONFIG_FILE = "config.json"
+# ✅ MongoDB Connection (replace with your connection string)
+MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017/")  # Default to localhost for dev
+DB_NAME = os.getenv("DB_NAME", "link_converter_bot")
+client = pymongo.MongoClient(MONGO_URL)
+db = client[DB_NAME]
+settings_collection = db["settings"]
 
-# ✅ Load settings from file (or use defaults)
+# ✅ Load settings from MongoDB (or use defaults)
 def load_settings():
-    try:
-        with open(CONFIG_FILE, "r") as f:
-            return json.load(f)
-    except FileNotFoundError:
+    settings = settings_collection.find_one({"_id": "config"})
+    if not settings:
         return {
-            "redirect_url": "",  # Start with an empty redirect URL
-            "old_bot_username": "" # Add old_bot_username
+            "redirect_url": "",
+            "old_bot_username": ""
         }
+    # Remove the _id field, we only need our settings
+    del settings["_id"]
+    return settings
 
-# ✅ Save settings to file
+# ✅ Save settings to MongoDB
 def save_settings(settings):
-    with open(CONFIG_FILE, "w") as f:
-        json.dump(settings, f)
+    # We use upsert=True to insert if it doesn't exist, update if it does
+    settings_collection.update_one({"_id": "config"}, {"$set": settings}, upsert=True)
 
 # ✅ Load initial settings
 settings = load_settings()
