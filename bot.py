@@ -98,10 +98,12 @@ async def tutorial(client: Client, query: CallbackQuery):
     await query.message.edit_text(
         "**📖 How to Use the Bot:**\n\n"
         "1️⃣ **Set Configuration (Admins Only):**\n"
-        "   - Use `/add_old_bot_username` to add a bot username to the configurations list.\n"
-        "   - Use `/set_redirect_url` to set the base URL for your redirection service, make sure to add the username next to the URL.\n"
+        "   - Use `/add_old_bot_username` to add a bot username.\n"
+        "   - Use `/set_redirect_url` to set the redirect URL for a username.\n"
+        "   - Use `/edit_redirect_url` to modify an existing redirect URL.\n"
+        "   - Use `/delete_old_bot_username` to remove a username and its URL.\n"
         "2️⃣ **Paste Your Links:** Paste your links (multiple lines are allowed).\n"
-        "3️⃣ **Get Converted Links:** The bot will automatically convert the links (if the bot username matches) and send them back, preserving other lines.\n\n"
+        "3️⃣ **Get Converted Links:** The bot will convert the links and send them back.\n\n"
         "⚙️ View current configuration: /config. Only authorized users can change settings.",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="help")]]),
         disable_web_page_preview=True
@@ -126,83 +128,180 @@ async def add_old_bot_username(client: Client, message: Message):
         "🤖 **Send the username of the old bot you are adding** (e.g., `HD10SHARE888888BOT`).  **Do not include the @ symbol.**",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancel", callback_data="config")]])
     )
+
+# ====================== Edit Redirect URL ======================
+@bot.on_message(filters.command("edit_redirect_url") & filters.user(ALLOWED_USERS))
+async def edit_redirect_url(client: Client, message: Message):
+    user_id = message.from_user.id
+    user_states[user_id] = "waiting_for_edit"  # Set user's state
+    await message.reply_text(
+        "✏️ **Send the OLD BOT USERNAME whose redirect URL you want to edit.**",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancel", callback_data="config")]])
+    )
+
+# ====================== Delete Old Bot Username ======================
+@bot.on_message(filters.command("delete_old_bot_username") & filters.user(ALLOWED_USERS))
+async def delete_old_bot_username(client: Client, message: Message):
+    user_id = message.from_user.id
+    user_states[user_id] = "waiting_for_delete"  # Set user's state
+    await message.reply_text(
+        "🗑️ **Send the username of the old bot you want to DELETE.**  (This will remove both the username and its redirect URL.)",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancel", callback_data="config")]])
+    )
 #Handles the old bot username
-@bot.on_message(filters.user(ALLOWED_USERS) & ~filters.command(["start", "help", "config", "set_redirect_url","add_old_bot_username"]) & filters.regex(r"^[a-zA-Z0-9_]{5,32}$"))
+@bot.on_message(filters.user(ALLOWED_USERS) & ~filters.command(["start", "help", "config", "set_redirect_url","add_old_bot_username", "edit_redirect_url", "delete_old_bot_username"]) & filters.regex(r"^[a-zA-Z0-9_]{5,32}$"))
 async def handle_old_bot_username_input(client: Client, message:Message):
     user_id = message.from_user.id
-    if user_states.get(user_id) != "waiting_for_username":
-        # Ignore if not in the correct state
-        return
-    new_username = message.text.strip()
-    if new_username.startswith("@"):
-        await message.reply_text("❌ **Invalid username format.** Please enter the username *without* the @ symbol.")
-        return
+    current_state = user_states.get(user_id)
 
-    # Check if the username already exists
-    global settings
-    settings = load_settings()  # Reload settings
-    for pair in settings["username_redirect_pairs"]:
-        if pair["username"] == new_username:
-            await message.reply_text(f"❌ **Username `{new_username}` already exists!**")
+    if current_state == "waiting_for_username":
+        new_username = message.text.strip()
+        if new_username.startswith("@"):
+            await message.reply_text("❌ **Invalid username format.** Please enter the username *without* the @ symbol.")
             return
 
-    # Add the new username to the list with an empty redirect_url for now
-    settings["username_redirect_pairs"].append({"username": new_username, "redirect_url": ""})
-    save_settings(settings)
-    await message.reply_text(f"✅ **Old bot username `{new_username}` added.**  Now use `/set_redirect_url` to set its redirect URL.")
-    user_states.pop(user_id, None)  # Remove user from state tracking
+        # Check if the username already exists
+        global settings
+        settings = load_settings()  # Reload settings
+        for pair in settings["username_redirect_pairs"]:
+            if pair["username"] == new_username:
+                await message.reply_text(f"❌ **Username `{new_username}` already exists!**")
+                return
 
+        # Add the new username to the list with an empty redirect_url for now
+        settings["username_redirect_pairs"].append({"username": new_username, "redirect_url": ""})
+        save_settings(settings)
+        await message.reply_text(f"✅ **Old bot username `{new_username}` added.**  Now use `/set_redirect_url` to set its redirect URL.")
+        user_states.pop(user_id, None)  # Remove user from state tracking
 
-@bot.on_message(filters.user(ALLOWED_USERS) & ~filters.command(["start", "help", "config", "set_redirect_url", "add_old_bot_username"]))
+    elif current_state == "waiting_for_delete":
+        username_to_delete = message.text.strip()
+        # Find and delete the username
+        global settings
+        settings = load_settings()  # Reload settings
+        found = False
+        for i, pair in enumerate(settings["username_redirect_pairs"]):
+            if pair["username"] == username_to_delete:
+                del settings["username_redirect_pairs"][i]
+                found = True
+                break  # Exit loop after deleting
+
+        if found:
+            save_settings(settings)
+            await message.reply_text(f"✅ **Username `{username_to_delete}` and its associated redirect URL have been deleted.**")
+        else:
+            await message.reply_text(f"❌ **Username `{username_to_delete}` not found.**")
+        user_states.pop(user_id, None)
+
+    elif current_state == "waiting_for_edit":
+            username_to_edit = message.text.strip()
+            global settings
+            settings = load_settings() #Reload settings
+            found = False
+            for pair in settings["username_redirect_pairs"]:
+                if pair["username"] == username_to_edit:
+                    user_states[user_id] = f"editing:{username_to_edit}" #Save which username to edit
+                    await message.reply_text(f"📝 **Send the new redirect URL for `{username_to_edit}`:**")
+                    found = True
+                    break #Exit loop
+            if not found:
+                await message.reply_text(f"❌ **Username `{username_to_edit}` not found.**")
+                user_states.pop(user_id, None) #Clear state
+
+    else:
+        # Ignore if not in the correct state
+        return
+
+@bot.on_message(filters.user(ALLOWED_USERS) & ~filters.command(["start", "help", "config", "set_redirect_url", "add_old_bot_username", "edit_redirect_url", "delete_old_bot_username"]))
 async def handle_set_redirect_url_input(client: Client, message: Message):
     user_id = message.from_user.id
-    if user_states.get(user_id) != "waiting_for_url":
-        # If the user is not in the "waiting_for_url" state, ignore the message
+    current_state = user_states.get(user_id)
+
+    if current_state == "waiting_for_url":
+        input_text = message.text.strip()
+        parts = input_text.split()
+
+        if len(parts) != 2:
+            await message.reply_text("❌ **Invalid input.** Please provide the redirect URL and the old bot username, separated by a space.")
+            return
+
+        new_url, old_bot_username = parts
+        new_url = new_url.strip()
+        old_bot_username = old_bot_username.strip()
+
+        # Validate the URL
+        url_pattern = re.compile(
+            r"^(?:http(s)?:\/\/)?[\w.-]+(?:\.[\w\.-]+)+[\w\-\._~:/?#[\]@!\$&'\(\)\*\+,;=.]+$"
+        )
+        if not url_pattern.match(new_url):
+            await message.reply_text("❌ **Invalid URL format.** Please provide a valid URL.")
+            return
+
+        # Ensure the URL is in https format
+        if new_url.startswith("http://"):
+            new_url = new_url.replace("http://", "https://")
+        elif not new_url.startswith("https://"):
+            new_url = "https://" + new_url
+        # Reload settings from the database
+        global settings
+        settings = load_settings()
+        # Find the username in the settings and update the redirect_url
+        username_found = False
+        for pair in settings["username_redirect_pairs"]:
+            if pair["username"] == old_bot_username:
+                pair["redirect_url"] = new_url
+                username_found = True
+                break
+
+        if not username_found:
+            await message.reply_text(f"❌ **Old bot username `{old_bot_username}` not found.**  Add it using `/add_old_bot_username` first.")
+            return
+
+        save_settings(settings)
+        await message.reply_text(f"✅ **Redirect URL updated for username `{old_bot_username}` to:** `{new_url}`")
+        user_states.pop(user_id, None)  # Remove user from state tracking
+
+    elif current_state and current_state.startswith("editing:"):
+        # Extract the username
+        old_bot_username = current_state.split(":")[1]
+        new_url = message.text.strip()
+
+        # Validate URL
+        url_pattern = re.compile(
+            r"^(?:http(s)?:\/\/)?[\w.-]+(?:\.[\w\.-]+)+[\w\-\._~:/?#[\]@!\<span class="math-inline">&'\\\(\\\)\\\*\\\+,;\=\.\]\+</span>"
+        )
+        if not url_pattern.match(new_url):
+            await message.reply_text("❌ **Invalid URL format.**")
+            return
+
+        # Ensure URL is HTTPS
+        if new_url.startswith("http://"):
+            new_url = new_url.replace("http://", "https://")
+        elif not new_url.startswith("https://"):
+            new_url = "https://" + new_url
+        # Reload settings
+        global settings
+        settings = load_settings()
+        # Update the redirect URL
+        # Reload settings
+        global settings
+        settings = load_settings()
+        # Update the redirect URL
+        for pair in settings["username_redirect_pairs"]:
+            if pair["username"] == old_bot_username:
+                pair["redirect_url"] = new_url
+                save_settings(settings)
+                await message.reply_text(f"✅ **Redirect URL for `{old_bot_username}` updated to:** `{new_url}`")
+                user_states.pop(user_id, None)
+                return  # Exit the function after updating
+
+        # If we get here, the username wasn't found (shouldn't happen if state is managed correctly)
+        await message.reply_text(f"❌ **Error: Username `{old_bot_username}` not found (unexpected).**")
+        user_states.pop(user_id, None)  # Clear the state to prevent getting stuck
+
+    else:
+        # Ignore if not in the correct state.
         return
-    """Handles the input of the redirect URL and associates it with an old bot username."""
-    input_text = message.text.strip()
-    parts = input_text.split()
-
-    if len(parts) != 2:
-        await message.reply_text("❌ **Invalid input.** Please provide the redirect URL and the old bot username, separated by a space.")
-        return
-
-    new_url, old_bot_username = parts
-    new_url = new_url.strip()
-    old_bot_username = old_bot_username.strip()
-
-    # Validate the URL
-    url_pattern = re.compile(
-        r"^(?:http(s)?:\/\/)?[\w.-]+(?:\.[\w\.-]+)+[\w\-\._~:/?#[\]@!\$&'\(\)\*\+,;=.]+$"
-    )
-    if not url_pattern.match(new_url):
-        await message.reply_text("❌ **Invalid URL format.** Please provide a valid URL.")
-        return
-
-    # Ensure the URL is in https format
-    if new_url.startswith("http://"):
-        new_url = new_url.replace("http://", "https://")
-    elif not new_url.startswith("https://"):
-        new_url = "https://" + new_url
-    # Reload settings from the database
-    global settings
-    settings = load_settings()
-    # Find the username in the settings and update the redirect_url
-    username_found = False
-    for pair in settings["username_redirect_pairs"]:
-        if pair["username"] == old_bot_username:
-            pair["redirect_url"] = new_url
-            username_found = True
-            break
-
-    if not username_found:
-        await message.reply_text(f"❌ **Old bot username `{old_bot_username}` not found.**  Add it using `/add_old_bot_username` first.")
-        return
-
-    save_settings(settings)
-    await message.reply_text(f"✅ **Redirect URL updated for username `{old_bot_username}` to:** `{new_url}`")
-    user_states.pop(user_id, None)  # Remove user from state tracking
-
 # =========================== View Config ===========================
 @bot.on_message(filters.command("config"))
 async def view_config(client: Client, message: Message):
@@ -234,6 +333,8 @@ async def button_handler(client: Client, query: CallbackQuery):
             reply_markup=InlineKeyboardMarkup([
               [InlineKeyboardButton("➕ Add Old Bot Username", callback_data="add_old_bot_username")],
               [InlineKeyboardButton("🔗 Set Redirect URL", callback_data="set_redirect_url")],
+              [InlineKeyboardButton("✏️ Edit Redirect URL", callback_data="edit_redirect_url")],
+              [InlineKeyboardButton("🗑️ Delete Username", callback_data="delete_old_bot_username")],
               [InlineKeyboardButton("🔙 Back", callback_data="help")]
           ]),
           disable_web_page_preview=True
@@ -252,7 +353,19 @@ async def button_handler(client: Client, query: CallbackQuery):
         "🤖 **Send the username of the old bot you are adding** (e.g., `HD10SHARE888888BOT`).  **Do not include the @ symbol.**",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancel", callback_data="config")]])
         )
+    elif data == "edit_redirect_url":
+        user_states[user_id] = "waiting_for_edit"
+        await query.message.edit_text(
+            "✏️ **Send the OLD BOT USERNAME whose redirect URL you want to edit.**",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancel", callback_data="config")]])
+        )
 
+    elif data == "delete_old_bot_username":
+        user_states[user_id] = "waiting_for_delete"
+        await query.message.edit_text(
+            "🗑️ **Send the username of the old bot you want to DELETE.**",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancel", callback_data="config")]])
+        )
 def chunk_text(text, max_length):
     """Splits text into chunks of at most max_length."""
     chunks = []
@@ -267,7 +380,7 @@ def chunk_text(text, max_length):
         chunks.append(current_chunk.strip())
     return chunks
 # ====================== Handle Link Conversion ======================
-@bot.on_message(filters.text & filters.user(ALLOWED_USERS) & ~filters.command(["start", "help", "config", "set_redirect_url", "add_old_bot_username"]))
+@bot.on_message(filters.text & filters.user(ALLOWED_USERS) & ~filters.command(["start", "help", "config", "set_redirect_url", "add_old_bot_username", "edit_redirect_url", "delete_old_bot_username"]))
 async def handle_link_conversion(client: Client, message: Message):
     """Converts multiple links from the input message."""
     input_text = message.text.strip()
@@ -323,3 +436,4 @@ async def handle_unexpected_text(client: Client, message: Message):
 
 # ✅ Start the bot
 bot.run()
+        
