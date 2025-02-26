@@ -139,6 +139,8 @@ async def handle_old_bot_username_input(client: Client, message:Message):
         return
 
     # Check if the username already exists
+    global settings
+    settings = load_settings()  # Reload settings
     for pair in settings["username_redirect_pairs"]:
         if pair["username"] == new_username:
             await message.reply_text(f"❌ **Username `{new_username}` already exists!**")
@@ -182,7 +184,9 @@ async def handle_set_redirect_url_input(client: Client, message: Message):
         new_url = new_url.replace("http://", "https://")
     elif not new_url.startswith("https://"):
         new_url = "https://" + new_url
-
+    # Reload settings from the database
+    global settings
+    settings = load_settings()
     # Find the username in the settings and update the redirect_url
     username_found = False
     for pair in settings["username_redirect_pairs"]:
@@ -312,4 +316,10 @@ async def handle_link_conversion(client: Client, message: Message):
             disable_web_page_preview=True
         )
 
-# =
+# =========================== Handle Unexpected Texts ===========================
+@bot.on_message(filters.text & ~filters.user(ALLOWED_USERS))
+async def handle_unexpected_text(client: Client, message: Message):
+    await message.reply_text("❌ **Invalid command!** Use `/help` to see available commands. Only authorized users can interact with this bot.")
+
+# ✅ Start the bot
+bot.run()
