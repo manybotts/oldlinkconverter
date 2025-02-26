@@ -166,7 +166,7 @@ async def handle_redirect_url_input(client: Client, message: Message):
         new_url = new_url.replace("http://", "https://")
     elif not new_url.startswith("https://"):
         new_url = "https://" + new_url
-    
+
     # Find the username in the settings and update the redirect_url
     username_found = False
     for pair in settings["username_redirect_pairs"]:
@@ -218,7 +218,10 @@ async def button_handler(client: Client, query: CallbackQuery):
     elif data == "help":
         await help_command(client, query.message)
     elif data == "set_redirect_url":
-        await set_redirect_url(client, query.message)
+        await message.reply_text(
+        "🔗 **Send the new redirect URL AND the associated old bot username, separated by a space.**\n\n"
+        "Example: `http://secure.tg-files.com/skyking/bot8 HD10SHARE888888BOT`",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancel", callback_data="config")]]))
     elif data == "add_old_bot_username":
         await add_old_bot_username(client, query.message)
 
@@ -245,7 +248,7 @@ async def handle_link_conversion(client: Client, message: Message):
     # Reload settings from the database
     global settings
     settings = load_settings()
-   # old_bot_username = settings["old_bot_username"] # Removed
+
 
     # Process each line separately
     for line in input_text.splitlines():
