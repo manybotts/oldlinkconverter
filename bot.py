@@ -227,4 +227,8 @@ async def handle_link_conversion(client: Client, message: Message):
     )
 # =========================== Handle Unexpected Texts ===========================
 @bot.on_message(filters.text & ~filters.user(ALLOWED_USERS))
-async def handle_unexpected_text(client:
+async def handle_unexpected_text(client: Client, message: Message):
+    await message.reply_text("❌ **Invalid command!** Use `/help` to see available commands. Only authorized users can interact with this bot.")
+
+# ✅ Start the bot
+bot.run()
