@@ -297,3 +297,139 @@ async def handle_set_redirect_url_input(client: Client, message: Message):
         # Ignore if not in the correct state.
         return
 # End of Part 1 of 4
+# =========================== View Config ===========================
+@bot.on_message(filters.command("config"))
+async def view_config(client: Client, message: Message):
+    config_text = "⚙ **Current Bot Configuration:**\n\n"
+    if settings["username_redirect_pairs"]:
+        for pair in settings["username_redirect_pairs"]:
+            config_text += f"🔹 **Username:** `{pair['username']}`, **Redirect URL:** `{pair['redirect_url']}`\n"
+    else:
+        config_text += "No usernames/redirect URLs configured yet."
+
+    await message.reply_text(config_text, disable_web_page_preview=True)
+
+# =========================== Handle Button Clicks ===========================
+@bot.on_callback_query()
+async def button_handler(client: Client, query: CallbackQuery):
+    data = query.data
+    user_id = query.from_user.id
+
+    if data == "config":
+      config_text = "⚙ **Current Bot Configuration:**\n\n"
+      if settings["username_redirect_pairs"]:
+          for pair in settings["username_redirect_pairs"]:
+              config_text += f"🔹 **Username:** `{pair['username']}`, **Redirect URL:** `{pair['redirect_url']}`\n"
+      else:
+          config_text += "No usernames/redirect URLs configured yet."
+
+      await query.message.edit_text(
+          config_text,
+            reply_markup=InlineKeyboardMarkup([
+              [InlineKeyboardButton("➕ Add Old Bot Username", callback_data="add_old_bot_username")],
+              [InlineKeyboardButton("🔗 Set Redirect URL", callback_data="set_redirect_url")],
+              [InlineKeyboardButton("✏️ Edit Redirect URL", callback_data="edit_redirect_url")],
+              [InlineKeyboardButton("🗑️ Delete Username", callback_data="delete_old_bot_username")],
+              [InlineKeyboardButton("🔙 Back", callback_data="help")]
+          ]),
+          disable_web_page_preview=True
+      )
+    elif data == "help":
+        await help_command(client, query.message)
+    elif data == "set_redirect_url":
+        user_states[user_id] = "waiting_for_url"  #Set the user state
+        await query.message.edit_text(
+        "🔗 **Send the new redirect URL AND the associated old bot username, separated by a space.**\n\n"
+        "Example: `http://secure.tg-files.com/skyking/bot8 HD10SHARE888888BOT`",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancel", callback_data="config")]])
+        )
+    elif data == "add_old_bot_username":
+        user_states[user_id] = "waiting_for_username" #Set the user state
+        await query.message.edit_text(
+        "🤖 **Send the username of the old bot you are adding** (e.g., `HD10SHARE888888BOT`).  **Do not include the @ symbol.**",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancel", callback_data="config")]])
+        )
+    elif data == "edit_redirect_url":
+        user_states[user_id] = "waiting_for_edit"
+        await query.message.edit_text(
+            "✏️ **Send the OLD BOT USERNAME whose redirect URL you want to edit.**",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancel", callback_data="config")]])
+        )
+
+    elif data == "delete_old_bot_username":
+        user_states[user_id] = "waiting_for_delete"
+        await query.message.edit_text(
+            "🗑️ **Send the username of the old bot you want to DELETE.**",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancel", callback_data="config")]])
+        )
+
+def chunk_text(text, max_length):
+    """Splits text into chunks of at most max_length."""
+    chunks = []
+    current_chunk = ""
+    for line in text.splitlines():
+        if len(current_chunk) + len(line) + 1 <= max_length:  # +1 for newline
+            current_chunk += line + "\n"
+        else:
+            chunks.append(current_chunk.strip())
+            current_chunk = line + "\n"
+    if current_chunk:
+        chunks.append(current_chunk.strip())
+    return chunks
+# ====================== Handle Link Conversion ======================
+@bot.on_message(filters.text & filters.user(ALLOWED_USERS) & ~filters.command(["start", "help", "config", "set_redirect_url", "add_old_bot_username", "edit_redirect_url", "delete_old_bot_username"]))
+async def handle_link_conversion(client: Client, message: Message):
+    """Converts multiple links from the input message."""
+    global settings
+    input_text = message.text.strip()
+    output_lines = []
+
+    # Reload settings from the database
+    settings = load_settings()
+    # Process each line separately
+    for line in input_text.splitlines():
+        line = line.strip()
+        match = re.search(r"\[\s*([^\]]+?)\s*\+\s*(https:\/\/t\.me\/([^?]+))\?start=([^\]\s]+)\s*\]", line)
+
+        if match:
+            text_part, full_url, extracted_username, start_parameter = match.groups()
+            text_part = text_part.strip()
+            extracted_username = extracted_username.strip()
+            start_parameter = start_parameter.strip()
+
+            # Iterate through ALL configured username/redirect URL pairs
+            username_matched = False
+            for pair in settings["username_redirect_pairs"]:
+                if extracted_username == pair["username"]:
+                    new_url = f"{pair['redirect_url']}?start={start_parameter}"
+                    new_url = new_url.replace("//?start", "/?start")
+                    output_lines.append(f"[{text_part} + {new_url}]")
+                    username_matched = True
+                    break  # Important: Stop after the FIRST match
+
+            if not username_matched:
+                output_lines.append(line) #If no username matched in the settings, append original
+        else:
+            output_lines.append(line)
+
+    output_text = "\n".join(output_lines)
+
+    # Split the output into chunks
+    max_message_length = 4096
+    chunks = chunk_text(output_text, max_message_length - 100)
+
+    for chunk in chunks:
+        await message.reply_text(
+            f"`{chunk}`",
+            disable_web_page_preview=True
+        )
+
+# =========================== Handle Unexpected Texts ===========================
+@bot.on_message(filters.text & ~filters.user(ALLOWED_USERS))
+async def handle_unexpected_text(client: Client, message: Message):
+    await message.reply_text("❌ **Invalid command!** Use `/help` to see available commands. Only authorized users can interact with this bot.")
+
+# ✅ Start the bot
+bot.run()
+
+#End of Part 2 of 4
