@@ -14,7 +14,8 @@ def load_settings():
             return json.load(f)
     except FileNotFoundError:
         return {
-            "redirect_url": ""  # Start with an empty redirect URL
+            "redirect_url": "",  # Start with an empty redirect URL
+            "old_bot_username": "" # Add old_bot_username
         }
 
 # ✅ Save settings to file
@@ -50,7 +51,7 @@ async def start(client: Client, message: Message):
     )
     await message.reply_text(
         "👋 **Welcome to the Redirect URL Setter Bot!**\n\n"
-        "I store the base URL for your link redirection service. 🚀\n\n"
+        "I store the base URL and old bot username for your link redirection service. 🚀\n\n"
         "Use the buttons below to navigate.",
         reply_markup=keyboard,
         disable_web_page_preview=True
@@ -72,13 +73,15 @@ async def help_command(client: Client, message: Message):
         reply_markup=keyboard,
         disable_web_page_preview=True
     )
+
 # =========================== View Example Input ===========================
 @bot.on_callback_query(filters.regex("example_input"))
 async def example_input(client: Client, query: CallbackQuery):
-    await query.message.edit_text(
+     await query.message.edit_text(
         "**📌 Example Input Format:**\n\n"
-        "`http://secure.tg-files.com/skyking/bot8`\n\n"
-        "💡 Use this format when sending the redirect URL to the bot. The bot will automatically convert it to HTTPS.",
+        "`[SEASON 1 + https://t.me/HD10SHARE888888BOT?start=Z2V0LTM2NTcwNDE1MTA1ODQzMC0zODE3MzUwMTc5NTQxNDI]`\n"
+        "`[SEASON 2 + https://t.me/HD10SHARE888888BOT?start=Z2V0LTM4MjczNjk0NzEzNTEyNC0zOTg3Njc4MTQwMzA4MzY]`\n\n"
+        "💡 Paste your links in this format.  The bot will replace the base URL *only* if the bot username (without @) matches the one set in the configuration.",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="help")]]),
         disable_web_page_preview=True
     )
@@ -88,10 +91,12 @@ async def example_input(client: Client, query: CallbackQuery):
 async def tutorial(client: Client, query: CallbackQuery):
     await query.message.edit_text(
         "**📖 How to Use the Bot:**\n\n"
-        "1️⃣ Send the **base redirect URL** to this bot.\n     Example: `http://secure.tg-files.com/skyking/bot8`\n"
-        "2️⃣ The bot will store this URL, ensuring it's in HTTPS format.\n"
-        "3️⃣ Your external link conversion service should use this stored URL as the base for constructing redirect links.\n\n"
-        "⚙️ You can view the current configuration using the /config command. Only authorized users can change the URL.",
+        "1️⃣ **Set Configuration (Admins Only):**\n"
+        "   - Use `/set_redirect_url` to set the base URL for your redirection service.\n"
+        "   - Use `/set_old_bot_username` to set the username (without @) of the bot you're replacing links for.\n"
+        "2️⃣ **Paste Your Links:** Paste your links in the specified format (see Example Input).\n"
+        "3️⃣ **Get Converted Links:** The bot will automatically convert the links (if the bot username matches) and send them back.\n\n"
+        "⚙️ View current configuration: /config. Only authorized users can change settings.",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="help")]]),
         disable_web_page_preview=True
     )
@@ -100,15 +105,35 @@ async def tutorial(client: Client, query: CallbackQuery):
 async def set_redirect_url(client: Client, message: Message):
     await message.reply_text(
         "🔗 **Send the new redirect URL** (e.g., `http://secure.tg-files.com/skyking/bot8`)",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancel", callback_data="help")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancel", callback_data="config")]])
     )
+
+# ====================== Set Old Bot Username ======================
+@bot.on_message(filters.command("set_old_bot_username") & filters.user(ALLOWED_USERS))
+async def set_old_bot_username(client: Client, message: Message):
+    await message.reply_text(
+        "🤖 **Send the username of the old bot you are replacing links for** (e.g., `HD10SHARE888888BOT`).  **Do not include the @ symbol.**",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancel", callback_data="config")]])
+    )
+#Handles the old bot username
+@bot.on_message(filters.user(ALLOWED_USERS) & ~filters.command(["start", "help", "config", "set_redirect_url","set_old_bot_username"]) & filters.regex(r"^[a-zA-Z0-9_]{5,32}$"))
+async def handle_old_bot_username_input(client: Client, message:Message):
+    new_username = message.text.strip()
+    if new_username.startswith("@"):
+        await message.reply_text("❌ **Invalid username format.** Please enter the username *without* the @ symbol.")
+        return
+
+    settings["old_bot_username"] = new_username
+    save_settings(settings)
+    await message.reply_text(f"✅ **Old bot username updated to:** `{settings['old_bot_username']}`")
 
 # =========================== View Config ===========================
 @bot.on_message(filters.command("config"))
 async def view_config(client: Client, message: Message):
     await message.reply_text(
         f"⚙ **Current Bot Configuration:**\n"
-        f"🔹 **Redirect URL:** `{settings['redirect_url']}`",
+        f"🔹 **Redirect URL:** `{settings['redirect_url']}`\n"
+        f"🔹 **Old Bot Username:** `{settings['old_bot_username']}`",
         disable_web_page_preview=True
     )
 
@@ -120,14 +145,23 @@ async def button_handler(client: Client, query: CallbackQuery):
     if data == "config":
         await query.message.edit_text(
             f"⚙ **Current Bot Configuration:**\n"
-            f"🔹 **Redirect URL:** `{settings['redirect_url']}`",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="help")]])
+            f"🔹 **Redirect URL:** `{settings['redirect_url']}`\n"
+            f"🔹 **Old Bot Username:** `{settings['old_bot_username']}`",
+             reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔗 Set Redirect URL", callback_data="set_redirect_url")],
+                [InlineKeyboardButton("🤖 Set Old Bot Username", callback_data="set_old_bot_username")],
+                [InlineKeyboardButton("🔙 Back", callback_data="help")]
+            ])
         )
     elif data == "help":
         await help_command(client, query.message)
+    elif data == "set_redirect_url":
+        await set_redirect_url(client, query.message)
+    elif data == "set_old_bot_username":
+        await set_old_bot_username(client, query.message)
 
 # ====================== Handle Redirect URL Input ======================
-@bot.on_message(filters.regex(r"^https?://.+") & filters.user(ALLOWED_USERS) & ~filters.command(["start", "help", "config", "set_redirect_url"]))
+@bot.on_message(filters.regex(r"^https?://.+") & filters.user(ALLOWED_USERS) & ~filters.command(["start", "help", "config", "set_redirect_url", "set_old_bot_username"]))
 async def handle_redirect_url_input(client: Client, message: Message):
     """Handles the input of the redirect URL, validates it, and saves it in https format."""
     new_url = message.text.strip()
@@ -150,9 +184,47 @@ async def handle_redirect_url_input(client: Client, message: Message):
     save_settings(settings)
     await message.reply_text(f"✅ **Redirect URL updated to:** `{settings['redirect_url']}`")
 
+
+# ====================== Handle Link Conversion ======================
+@bot.on_message(filters.text & filters.user(ALLOWED_USERS) & ~filters.command(["start", "help", "config", "set_redirect_url", "set_old_bot_username"]))
+async def handle_link_conversion(client: Client, message: Message):
+    """Converts multiple links from the input message."""
+    input_text = message.text.strip()
+    converted_links = []
+    old_bot_username = settings["old_bot_username"]
+
+    # Check if old_bot_username is set
+    if not old_bot_username:
+        await message.reply_text("❌ **Old bot username not set.** Please set it using `/set_old_bot_username`.")
+        return
+    # Find all link matches in the input
+    for match in re.finditer(r"\[([^\]]+) \+ (https:\/\/t\.me\/([^?]+))\?start=([^\]]+)\]", input_text):
+        text_part = match.group(1).strip()
+        full_url = match.group(2).strip()
+        extracted_username = match.group(3).strip()
+        start_parameter = match.group(4).strip()
+
+        # Check if the extracted username matches the stored old_bot_username
+        if extracted_username == old_bot_username:
+            # Construct the new URL
+            new_url = f"{settings['redirect_url']}?start={start_parameter}"
+            converted_links.append(f"{text_part} + {new_url}")
+
+    #Check if the bot could find links
+    if not converted_links:
+        await message.reply_text("❌ **No valid links found for the configured bot username.**  Please check the input and the configured `old_bot_username`.")
+        return
+    # Join all converted links into a single string, one link per line
+    output_text = "\n".join([f"`{link}`" for link in converted_links])
+
+    await message.reply_text(
+        f"**✅ Converted Links:**\n\n{output_text}",
+        disable_web_page_preview=True
+    )
 # =========================== Handle Unexpected Texts ===========================
 @bot.on_message(filters.text & ~filters.user(ALLOWED_USERS))
 async def handle_unexpected_text(client: Client, message: Message):
-    await message.reply_text("❌ **Invalid command!** Use `/help` to see available commands.  Only authorized users can set the redirect URL.")
+    await message.reply_text("❌ **Invalid command!** Use `/help` to see available commands. Only authorized users can interact with this bot.")
+
 # ✅ Start the bot
 bot.run()
