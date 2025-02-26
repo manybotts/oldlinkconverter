@@ -4,7 +4,7 @@ from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 import pymongo
 
-# ✅ MongoDB Connection (replace with your connection string)
+# ✅ MongoDB Connection
 MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017/")  # Default to localhost for dev
 DB_NAME = os.getenv("DB_NAME", "link_converter_bot")
 client = pymongo.MongoClient(MONGO_URL)
@@ -190,16 +190,28 @@ async def handle_redirect_url_input(client: Client, message: Message):
     save_settings(settings)
     await message.reply_text(f"✅ **Redirect URL updated to:** `{settings['redirect_url']}`")
 
-
+def chunk_text(text, max_length):
+    """Splits text into chunks of at most max_length."""
+    chunks = []
+    current_chunk = ""
+    for line in text.splitlines():
+        if len(current_chunk) + len(line) + 1 <= max_length:  # +1 for newline
+            current_chunk += line + "\n"
+        else:
+            chunks.append(current_chunk.strip())
+            current_chunk = line + "\n"
+    if current_chunk:
+        chunks.append(current_chunk.strip())
+    return chunks
 # ====================== Handle Link Conversion ======================
 @bot.on_message(filters.text & filters.user(ALLOWED_USERS) & ~filters.command(["start", "help", "config", "set_redirect_url", "set_old_bot_username"]))
 async def handle_link_conversion(client: Client, message: Message):
     """Converts multiple links from the input message."""
     input_text = message.text.strip()
-    output_lines = []  # Store processed lines here
+    output_lines = []
 
-    # ✅ Reload settings from the database *here*
-    global settings  # Important: Use the global settings variable
+    # Reload settings from the database
+    global settings
     settings = load_settings()
     old_bot_username = settings["old_bot_username"]
 
@@ -214,26 +226,34 @@ async def handle_link_conversion(client: Client, message: Message):
         match = re.search(r"\[([^\]]+) \+ (https:\/\/t\.me\/([^?]+))\?start=([^\]]+)\]", line)
 
         if match:
-            text_part = match.group(1).strip()
-            full_url = match.group(2).strip()
-            extracted_username = match.group(3).strip()
-            start_parameter = match.group(4).strip()
+            text_part, _, extracted_username, start_parameter = match.groups()
+            text_part = text_part.strip()
+            extracted_username = extracted_username.strip()
+            start_parameter = start_parameter.strip()
+
 
             if extracted_username == old_bot_username:
                 new_url = f"{settings['redirect_url']}?start={start_parameter}"
-                output_lines.append(f"[{text_part} + {new_url}]")  # Reconstruct with new URL
+                new_url = new_url.replace("//?start", "/?start") # Remove double slash
+                output_lines.append(f"[{text_part} + {new_url}]")
             else:
-                output_lines.append(line)  # Keep original line if username doesn't match
+                output_lines.append(line)
         else:
-            output_lines.append(line)  # Keep original line if no match
+            output_lines.append(line)
 
-    # Join all lines into a single string
+
     output_text = "\n".join(output_lines)
 
-    await message.reply_text(
-        f"**✅ Converted Links:**\n\n`{output_text}`",
-        disable_web_page_preview=True
-    )
+    # Split the output into chunks
+    max_message_length = 4096
+    chunks = chunk_text(output_text, max_message_length - 100)
+
+    for chunk in chunks:
+        await message.reply_text(
+            f"`{chunk}`",
+            disable_web_page_preview=True
+        )
+
 # =========================== Handle Unexpected Texts ===========================
 @bot.on_message(filters.text & ~filters.user(ALLOWED_USERS))
 async def handle_unexpected_text(client: Client, message: Message):
