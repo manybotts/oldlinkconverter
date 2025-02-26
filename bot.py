@@ -223,24 +223,22 @@ async def handle_link_conversion(client: Client, message: Message):
     # Process each line separately
     for line in input_text.splitlines():
         line = line.strip()
-        match = re.search(r"\[([^\]]+) \+ (https:\/\/t\.me\/([^?]+))\?start=([^\]]+)\]", line)
+        match = re.search(r"\[\s*([^\]]+?)\s*\+\s*(https:\/\/t\.me\/([^?]+))\?start=([^\]\s]+)\s*\]", line)
 
         if match:
-            text_part, _, extracted_username, start_parameter = match.groups()
+            text_part, full_url, extracted_username, start_parameter = match.groups()
             text_part = text_part.strip()
             extracted_username = extracted_username.strip()
             start_parameter = start_parameter.strip()
 
-
             if extracted_username == old_bot_username:
                 new_url = f"{settings['redirect_url']}?start={start_parameter}"
-                new_url = new_url.replace("//?start", "/?start") # Remove double slash
+                new_url = new_url.replace("//?start", "/?start")
                 output_lines.append(f"[{text_part} + {new_url}]")
             else:
                 output_lines.append(line)
         else:
             output_lines.append(line)
-
 
     output_text = "\n".join(output_lines)
 
