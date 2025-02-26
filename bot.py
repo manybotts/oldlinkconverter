@@ -208,17 +208,17 @@ async def handle_link_conversion(client: Client, message: Message):
         if extracted_username == old_bot_username:
             # Construct the new URL
             new_url = f"{settings['redirect_url']}?start={start_parameter}"
-            converted_links.append(f"{text_part} + {new_url}")
+            converted_links.append(f"[{text_part} + {new_url}]") # Include brackets here
 
     #Check if the bot could find links
     if not converted_links:
         await message.reply_text("❌ **No valid links found for the configured bot username.**  Please check the input and the configured `old_bot_username`.")
         return
     # Join all converted links into a single string, one link per line
-    output_text = "\n".join([f"`{link}`" for link in converted_links])
+    output_text = "\n".join(converted_links) # No backticks here
 
     await message.reply_text(
-        f"**✅ Converted Links:**\n\n{output_text}",
+        f"**✅ Converted Links:**\n\n`{output_text}`", # Triple backticks here
         disable_web_page_preview=True
     )
 # =========================== Handle Unexpected Texts ===========================
